@@ -2,6 +2,8 @@
 
 Complete Infrastructure as Code (IaC) for deploying Fincore full-stack application on Google Cloud Platform (GCP) in the Non-Production Environment (NPE).
 
+<!-- Deployment Trigger: 2025-12-30 -->
+
 ## Overview
 
 This repository contains Terraform modules and testing scripts to deploy and validate a production-ready infrastructure in Google Cloud. The NPE environment is optimized for cost-efficiency while maintaining all necessary components for application deployment and testing.
