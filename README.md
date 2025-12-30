@@ -430,3 +430,5 @@ All infrastructure code is proprietary to Fincore.
 **Environment:** NPE (Non-Production)  
 **Region:** europe-west2 (London)  
 **Status:** Production-Ready Infrastructure
+
+<!-- Deployment trigger -->
