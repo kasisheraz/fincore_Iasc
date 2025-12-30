@@ -1,2 +1,10 @@
 ﻿# GCP Service Account Key
 gcp-sa-key.json
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfvars.backup
+.terraform.tfstate.lock.info
