@@ -91,17 +91,6 @@ jobs:
           terraform_version: '~1.6.0'
           terraform_wrapper: false
 
-      - name: � Debug Secret
-        run: |
-          if [ -z "$GCP_KEY" ]; then
-            echo "❌ SECRET IS EMPTY"
-            exit 1
-          else
-            echo "✅ Secret exists, length: ${#GCP_KEY}"
-          fi
-        env:
-          GCP_KEY: ${{ secrets.GCP_SA_KEY }}
-
       - name: �🔐 Authenticate to GCP
         uses: google-github-actions/auth@v2
         with:
