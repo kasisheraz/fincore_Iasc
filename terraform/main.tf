@@ -1,6 +1,6 @@
 # Minimal Database Permissions Configuration
 # Only adds database permissions to existing Cloud SQL instance
-# Updated: 2025-12-30
+# Deploy: 2025-12-30
 
 # Configure Google Cloud Provider
 provider "google" {
