@@ -1,0 +1,224 @@
+name: 🔄 Promote NPE to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type "PROMOTE" to confirm deployment to production'
+        required: true
+        type: string
+      
+      skip_tests:
+        description: 'Skip infrastructure tests in production'
+        required: true
+        default: false
+        type: boolean
+      
+      backup_before_deploy:
+        description: 'Create database backup before deployment'
+        required: true
+        default: true
+        type: boolean
+
+env:
+  TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+jobs:
+  validate-promotion:
+    name: 🔍 Validate Promotion Request
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: ✅ Validate Confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirmation }}" != "PROMOTE" ]; then
+            echo "❌ Invalid confirmation. Please type 'PROMOTE' to proceed."
+            exit 1
+          fi
+          echo "✅ Promotion confirmed"
+
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🔍 Verify NPE Environment
+        run: |
+          echo "Checking NPE environment status..."
+          
+          # Check if NPE VPC exists
+          if ! gcloud compute networks describe fincore-npe-vpc --project=${{ vars.GCP_PROJECT_ID }} --quiet; then
+            echo "❌ NPE environment not found or not properly deployed"
+            exit 1
+          fi
+          
+          # Check if Cloud SQL instance exists
+          if ! gcloud sql instances describe fincore-npe-db --project=${{ vars.GCP_PROJECT_ID }} --quiet; then
+            echo "❌ NPE database not found"
+            exit 1
+          fi
+          
+          echo "✅ NPE environment verified"
+
+  backup-production:
+    name: 💾 Backup Production Database
+    runs-on: ubuntu-latest
+    needs: validate-promotion
+    if: github.event.inputs.backup_before_deploy == 'true'
+    environment: prod
+    
+    steps:
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 💾 Create Database Backup
+        run: |
+          BACKUP_ID="pre-promotion-$(date +%Y%m%d-%H%M%S)"
+          
+          echo "Creating backup: $BACKUP_ID"
+          
+          gcloud sql backups create \
+            --instance=fincore-prod-db \
+            --description="Backup before NPE promotion on $(date)" \
+            --project=${{ vars.GCP_PROJECT_ID }}
+          
+          echo "✅ Backup created successfully"
+          echo "## Production Backup Created" >> $GITHUB_STEP_SUMMARY
+          echo "Backup ID: $BACKUP_ID" >> $GITHUB_STEP_SUMMARY
+
+  deploy-production:
+    name: 🚀 Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [validate-promotion, backup-production]
+    if: always() && needs.validate-promotion.result == 'success' && (needs.backup-production.result == 'success' || needs.backup-production.result == 'skipped')
+    environment: 
+      name: prod
+      url: https://console.cloud.google.com/sql/instances
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '~1.6.0'
+          terraform_wrapper: false
+
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🚀 Terraform Init
+        run: |
+          cd terraform
+          terraform init -backend-config="environments/prod/backend.tf"
+
+      - name: 📋 Terraform Plan
+        id: plan
+        run: |
+          cd terraform
+          terraform plan \
+            -var-file="environments/prod/terraform.tfvars" \
+            -out=prod-tfplan \
+            -detailed-exitcode
+        continue-on-error: true
+
+      - name: 🚀 Apply Infrastructure
+        if: steps.plan.outputs.exitcode == '2'
+        run: |
+          cd terraform
+          terraform apply -auto-approve prod-tfplan
+
+      - name: 🔐 Deploy Database Permissions
+        run: |
+          cd terraform
+          terraform apply \
+            -target=module.database_permissions \
+            -var-file="environments/prod/terraform.tfvars" \
+            -auto-approve
+
+      - name: ✅ Deployment Summary
+        run: |
+          echo "## Production Deployment Completed" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: **Production**" >> $GITHUB_STEP_SUMMARY
+          echo "Timestamp: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "Git SHA: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  test-production:
+    name: 🧪 Test Production Environment
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: github.event.inputs.skip_tests == 'false'
+    environment: prod
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🧪 Run Production Tests
+        run: |
+          # Create a production version of the test script
+          sed 's/npe/prod/g' test-npe-infrastructure.sh > test-prod-infrastructure.sh
+          chmod +x test-prod-infrastructure.sh
+          ./test-prod-infrastructure.sh
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          REGION: europe-west2
+          ENVIRONMENT: prod
+
+      - name: 📊 Test Results
+        run: |
+          echo "## Production Tests Completed" >> $GITHUB_STEP_SUMMARY
+          echo "All infrastructure components verified" >> $GITHUB_STEP_SUMMARY
+
+  notify-success:
+    name: 📢 Notify Success
+    runs-on: ubuntu-latest
+    needs: [deploy-production, test-production]
+    if: always() && needs.deploy-production.result == 'success'
+    
+    steps:
+      - name: 🎉 Success Notification
+        run: |
+          echo "## 🎉 Production Promotion Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Infrastructure deployed to production" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Database permissions configured" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.test-production.result }}" == "success" ]; then
+            echo "✅ Production tests passed" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ github.event.inputs.skip_tests }}" == "true" ]; then
+            echo "⏭️ Production tests skipped" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next Steps:**" >> $GITHUB_STEP_SUMMARY
+          echo "- Deploy application containers to Cloud Run" >> $GITHUB_STEP_SUMMARY
+          echo "- Update DNS records if necessary" >> $GITHUB_STEP_SUMMARY
+          echo "- Monitor application health" >> $GITHUB_STEP_SUMMARY

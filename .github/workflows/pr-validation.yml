@@ -1,0 +1,213 @@
+name: 🧪 Pull Request Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/**'
+
+env:
+  TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+jobs:
+  terraform-check:
+    name: 🔍 Terraform Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '~1.6.0'
+          terraform_wrapper: false
+
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: ✅ Terraform Format Check
+        id: fmt
+        run: |
+          cd terraform
+          terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: 🚀 Terraform Init (NPE)
+        run: |
+          cd terraform
+          terraform init -backend-config="environments/npe/backend.tf"
+
+      - name: ✅ Terraform Validate
+        id: validate
+        run: |
+          cd terraform
+          terraform validate
+
+      - name: 📋 Terraform Plan (NPE)
+        id: plan-npe
+        run: |
+          cd terraform
+          terraform plan \
+            -var-file="environments/npe/terraform.tfvars" \
+            -no-color \
+            -detailed-exitcode
+        continue-on-error: true
+
+      - name: 🚀 Terraform Init (Prod)
+        run: |
+          cd terraform
+          terraform init -backend-config="environments/prod/backend.tf" -reconfigure
+
+      - name: 📋 Terraform Plan (Prod)
+        id: plan-prod
+        run: |
+          cd terraform
+          terraform plan \
+            -var-file="environments/prod/terraform.tfvars" \
+            -no-color \
+            -detailed-exitcode
+        continue-on-error: true
+
+      - name: 📝 Update PR Comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        env:
+          PLAN_NPE: "terraform\n${{ steps.plan-npe.outputs.stdout }}"
+          PLAN_PROD: "terraform\n${{ steps.plan-prod.outputs.stdout }}"
+        with:
+          script: |
+            const output = `## Terraform Validation Results
+            
+            #### Formatting and Validation 🖌️\`${{ steps.fmt.outcome }}\`
+            #### Validation 🤖\`${{ steps.validate.outcome }}\`
+            
+            #### NPE Environment Plan 📖\`${{ steps.plan-npe.outcome }}\`
+            
+            <details><summary>Show NPE Plan</summary>
+            
+            \`\`\`${process.env.PLAN_NPE}\`\`\`
+            
+            </details>
+            
+            #### Production Environment Plan 📖\`${{ steps.plan-prod.outcome }}\`
+            
+            <details><summary>Show Production Plan</summary>
+            
+            \`\`\`${process.env.PLAN_PROD}\`\`\`
+            
+            </details>
+            
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+  security-check:
+    name: 🔒 Security Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔍 Check for Sensitive Data
+        run: |
+          echo "Scanning for potential sensitive data..."
+          
+          # Check for potential secrets or passwords
+          if grep -r -i "password\|secret\|key" terraform/ --exclude-dir=.terraform --exclude="*.md" | grep -v "var\." | grep -v "data\." | grep -v "#"; then
+            echo "❌ Potential sensitive data found in Terraform files"
+            exit 1
+          fi
+          
+          echo "✅ No sensitive data detected"
+
+      - name: 🔍 Validate Terraform Security
+        run: |
+          echo "Validating security configurations..."
+          
+          # Check for public access configurations
+          if grep -r "0.0.0.0/0" terraform/ --exclude-dir=.terraform; then
+            echo "⚠️ Found potential public access configurations - please review"
+          fi
+          
+          # Check for SSL/TLS configurations
+          if ! grep -r "ssl.*=.*true\|tls.*=.*true" terraform/ --exclude-dir=.terraform; then
+            echo "⚠️ SSL/TLS configurations not found - ensure secure connections"
+          fi
+          
+          echo "✅ Security validation completed"
+
+  documentation-check:
+    name: 📚 Documentation Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 📝 Check README Updates
+        run: |
+          echo "Checking if documentation is up to date..."
+          
+          # Check if terraform files changed but README wasn't updated
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            terraform_changed=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | grep -E "terraform/.*\.tf$" || true)
+            readme_changed=$(git diff --name-only ${{ github.event.before }} ${{ github.event.after }} | grep -E "README\.md$|\.md$" || true)
+            
+            if [ ! -z "$terraform_changed" ] && [ -z "$readme_changed" ]; then
+              echo "⚠️ Terraform files changed but documentation may need updates"
+              echo "Consider updating README.md or relevant documentation"
+            fi
+          fi
+          
+          echo "✅ Documentation check completed"
+
+  summary:
+    name: 📊 Validation Summary
+    runs-on: ubuntu-latest
+    needs: [terraform-check, security-check, documentation-check]
+    if: always()
+    
+    steps:
+      - name: 📊 Generate Summary
+        run: |
+          echo "## Pull Request Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.terraform-check.result }}" == "success" ]; then
+            echo "✅ Terraform validation passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Terraform validation failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.security-check.result }}" == "success" ]; then
+            echo "✅ Security checks passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Security checks failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ "${{ needs.documentation-check.result }}" == "success" ]; then
+            echo "✅ Documentation checks passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Documentation checks failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Ready for merge:** ${{ needs.terraform-check.result == 'success' && needs.security-check.result == 'success' && needs.documentation-check.result == 'success' }}" >> $GITHUB_STEP_SUMMARY

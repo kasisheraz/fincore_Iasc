@@ -1,0 +1,331 @@
+name: 🚀 Fincore Infrastructure Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target Environment'
+        required: true
+        default: 'npe'
+        type: choice
+        options:
+          - npe
+          - prod
+      
+      terraform_action:
+        description: 'Terraform Action'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      
+      deploy_permissions:
+        description: 'Deploy Database Permissions'
+        required: true
+        default: true
+        type: boolean
+      
+      run_tests:
+        description: 'Run Infrastructure Tests'
+        required: true
+        default: true
+        type: boolean
+      
+      auto_approve:
+        description: 'Auto-approve Terraform apply (use with caution)'
+        required: true
+        default: false
+        type: boolean
+
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/**'
+
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'terraform/**'
+
+env:
+  TF_VAR_project_id: ${{ vars.GCP_PROJECT_ID }}
+  TF_IN_AUTOMATION: true
+  TF_INPUT: false
+
+jobs:
+  validate:
+    name: 🔍 Validate Terraform
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🏷️ Set Environment
+        id: set-env
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "environment=prod" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            echo "environment=npe" >> $GITHUB_OUTPUT
+          else
+            echo "environment=npe" >> $GITHUB_OUTPUT
+          fi
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '~1.6.0'
+          terraform_wrapper: false
+
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: ✅ Terraform Format Check
+        run: |
+          cd terraform
+          terraform fmt -check -recursive
+
+      - name: 🚀 Terraform Init
+        run: |
+          cd terraform
+          terraform init -backend-config="environments/${{ steps.set-env.outputs.environment }}/backend.tf"
+
+      - name: ✅ Terraform Validate
+        run: |
+          cd terraform
+          terraform validate
+
+  plan:
+    name: 📋 Terraform Plan
+    runs-on: ubuntu-latest
+    needs: validate
+    environment: ${{ needs.validate.outputs.environment }}
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '~1.6.0'
+          terraform_wrapper: false
+
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🚀 Terraform Init
+        run: |
+          cd terraform
+          terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.tf"
+
+      - name: 📋 Terraform Plan
+        id: plan
+        run: |
+          cd terraform
+          terraform plan \
+            -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars" \
+            -out=tfplan \
+            -detailed-exitcode
+        continue-on-error: true
+
+      - name: 📊 Plan Summary
+        run: |
+          cd terraform
+          echo "## Terraform Plan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: **${{ needs.validate.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Exit Code: ${{ steps.plan.outputs.exitcode }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.plan.outputs.exitcode }}" == "2" ]; then
+            echo "✅ Plan contains changes" >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.plan.outputs.exitcode }}" == "0" ]; then
+            echo "ℹ️ No changes detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Plan failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 💾 Upload Plan Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ needs.validate.outputs.environment }}
+          path: terraform/tfplan
+          retention-days: 5
+
+  apply:
+    name: 🚀 Terraform Apply
+    runs-on: ubuntu-latest
+    needs: [validate, plan]
+    environment: ${{ needs.validate.outputs.environment }}
+    if: |
+      (github.event_name == 'workflow_dispatch' && 
+       github.event.inputs.terraform_action == 'apply') ||
+      (github.event_name == 'push' && 
+       github.ref == 'refs/heads/develop' && 
+       needs.validate.outputs.environment == 'npe')
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '~1.6.0'
+          terraform_wrapper: false
+
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🚀 Terraform Init
+        run: |
+          cd terraform
+          terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.tf"
+
+      - name: 💾 Download Plan Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ needs.validate.outputs.environment }}
+          path: terraform/
+
+      - name: 🚀 Terraform Apply
+        run: |
+          cd terraform
+          if [[ "${{ github.event.inputs.auto_approve }}" == "true" ]]; then
+            terraform apply -auto-approve tfplan
+          else
+            terraform apply tfplan
+          fi
+
+      - name: 📊 Apply Summary
+        run: |
+          echo "## Terraform Apply Completed" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: **${{ needs.validate.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Timestamp: $(date)" >> $GITHUB_STEP_SUMMARY
+
+  deploy-permissions:
+    name: 🔐 Deploy Database Permissions
+    runs-on: ubuntu-latest
+    needs: [validate, apply]
+    environment: ${{ needs.validate.outputs.environment }}
+    if: |
+      always() && 
+      needs.apply.result == 'success' &&
+      (github.event_name != 'workflow_dispatch' || 
+       github.event.inputs.deploy_permissions == 'true')
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '~1.6.0'
+          terraform_wrapper: false
+
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🚀 Initialize Permissions Module
+        run: |
+          cd terraform
+          terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.tf"
+
+      - name: 🔐 Deploy Database Permissions
+        run: |
+          cd terraform
+          terraform apply \
+            -target=module.database_permissions \
+            -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars" \
+            -auto-approve
+
+      - name: ✅ Permissions Summary
+        run: |
+          echo "## Database Permissions Deployed" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: **${{ needs.validate.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Database: fincore_db" >> $GITHUB_STEP_SUMMARY
+          echo "User: fincore_app" >> $GITHUB_STEP_SUMMARY
+
+  test:
+    name: 🧪 Infrastructure Tests
+    runs-on: ubuntu-latest
+    needs: [validate, apply, deploy-permissions]
+    environment: ${{ needs.validate.outputs.environment }}
+    if: |
+      always() &&
+      (needs.apply.result == 'success' || needs.apply.result == 'skipped') &&
+      (github.event_name != 'workflow_dispatch' || 
+       github.event.inputs.run_tests == 'true')
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🧪 Run Infrastructure Tests
+        run: |
+          chmod +x test-npe-infrastructure.sh
+          ./test-npe-infrastructure.sh
+        env:
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          REGION: europe-west2
+          ENVIRONMENT: ${{ needs.validate.outputs.environment }}
+
+      - name: 📊 Test Summary
+        run: |
+          echo "## Infrastructure Tests Completed" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: **${{ needs.validate.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+
+  cleanup:
+    name: 🧹 Cleanup
+    runs-on: ubuntu-latest
+    needs: [validate, plan]
+    if: always()
+    
+    steps:
+      - name: 🗑️ Cleanup Artifacts
+        uses: geekyeggo/delete-artifact@v5
+        with:
+          name: tfplan-${{ needs.validate.outputs.environment }}
+        continue-on-error: true
