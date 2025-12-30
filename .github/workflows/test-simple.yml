@@ -1,0 +1,23 @@
+name: Simple Secret Test
+
+on:
+  push:
+    branches:
+      - develop
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test secret accessibility
+        env:
+          MY_SECRET: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          if [ -z "$MY_SECRET" ]; then
+            echo "SECRET IS EMPTY"
+            echo "Checking all available secrets..."
+            env | grep -i secret || echo "No secrets found"
+          else
+            echo "Secret length: ${#MY_SECRET}"
+            echo "First 50 chars: ${MY_SECRET:0:50}"
+          fi
