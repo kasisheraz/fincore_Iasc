@@ -107,7 +107,7 @@ jobs:
       - name: 🚀 Terraform Init
         run: |
           cd terraform
-          terraform init -backend-config="environments/${{ steps.set-env.outputs.environment }}/backend.tf"
+          terraform init -backend-config="environments/${{ steps.set-env.outputs.environment }}/backend.conf"
 
       - name: ✅ Terraform Validate
         run: |
@@ -141,7 +141,7 @@ jobs:
       - name: 🚀 Terraform Init
         run: |
           cd terraform
-          terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.tf"
+          terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.conf"
 
       - name: 📋 Terraform Plan
         id: plan
@@ -209,7 +209,7 @@ jobs:
       - name: 🚀 Terraform Init
         run: |
           cd terraform
-          terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.tf"
+          terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.conf"
 
       - name: 💾 Download Plan Artifact
         uses: actions/download-artifact@v4
@@ -264,7 +264,7 @@ jobs:
       - name: 🚀 Initialize Permissions Module
         run: |
           cd terraform
-          terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.tf"
+          terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.conf"
 
       - name: 🔐 Deploy Database Permissions
         run: |
