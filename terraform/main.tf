@@ -18,6 +18,7 @@ locals {
 # VPC Module (simplified - uses existing VPC)
 module "vpc" {
   source      = "./modules/vpc"
+  project_id  = var.project_id
   environment = local.environment
 }
 
@@ -116,32 +117,32 @@ module "database_permissions" {
   database_endpoint = "${module.cloud_sql.instance_ip_address}:3306"
   admin_username    = "root"
   admin_password    = random_password.root_password.result
-  
+
   # Database configuration
   database_name = local.database_name
   app_username  = var.app_username
   app_password  = random_password.fincore_app_password.result
-  
+
   # Relaxed permissions for schema evolution
   app_privileges = var.app_privileges
-  
+
   # Security settings
   require_ssl = var.cloud_sql_require_ssl
-  
+
   # Admin user for schema management
   create_admin_user  = var.create_admin_user
   app_admin_username = "fincore_admin"
   app_admin_password = random_password.fincore_admin_password.result
   admin_privileges   = var.app_privileges
-  
+
   # No readonly user in NPE
   create_readonly_user = false
   readonly_username    = ""
   readonly_password    = ""
-  
+
   # Environment context
   environment = local.environment
   project_id  = var.project_id
-  
+
   depends_on = [module.cloud_sql]
 }

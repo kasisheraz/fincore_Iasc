@@ -1,18 +1,8 @@
 # VPC Module - Simplified for existing VPC
-variable "environment" {
-  description = "Environment name"
-  type        = string
-}
 
 output "vpc_network" {
   description = "VPC network name"
   value       = "projects/${var.project_id}/global/networks/default"
-}
-
-variable "project_id" {
-  description = "GCP Project ID"
-  type        = string
-  default     = ""
 }
 
 output "private_subnet" {
