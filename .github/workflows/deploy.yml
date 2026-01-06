@@ -243,24 +243,12 @@ jobs:
           cd terraform
           terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.conf"
 
-      - name: ⏳ Wait for artifact availability
+      - name: 📋 Re-run Terraform Plan
         run: |
-          echo "Waiting for artifact to be indexed by GitHub..."
-          sleep 10
-
-      - name: 💾 Download Plan Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tfplan-${{ needs.validate.outputs.environment }}
-          path: terraform/
-      
-      - name: 🔍 Verify Plan File
-        run: |
-          ls -la terraform/
-          if [ ! -f terraform/tfplan ]; then
-            echo "❌ tfplan file not found after download!"
-            exit 1
-          fi
+          cd terraform
+          terraform plan \
+            -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars" \
+            -out=tfplan
 
       - name: 🚀 Terraform Apply
         run: |
