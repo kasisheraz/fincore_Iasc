@@ -220,10 +220,7 @@ jobs:
         github.event.inputs.terraform_action == 'apply') ||
        (github.event_name == 'push' && 
         github.ref == 'refs/heads/develop' && 
-        needs.validate.outputs.environment == 'npe') ||
-       (github.event_name == 'push' && 
-        github.ref == 'refs/heads/main' && 
-        needs.validate.outputs.environment == 'prod'))
+        needs.validate.outputs.environment == 'npe'))
     
     steps:
       - name: 📥 Checkout Code
