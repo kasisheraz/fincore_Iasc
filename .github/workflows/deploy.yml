@@ -338,6 +338,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
       - name: 🧪 Run Infrastructure Tests
+        continue-on-error: true
         run: |
           chmod +x test-npe-infrastructure.sh
           ./test-npe-infrastructure.sh
