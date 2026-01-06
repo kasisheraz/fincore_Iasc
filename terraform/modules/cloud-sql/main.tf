@@ -23,6 +23,13 @@ resource "google_sql_database_instance" "main" {
     ip_configuration {
       ipv4_enabled = true
       require_ssl  = var.cloud_sql_require_ssl
+
+      # Allow GitHub Actions runners to connect
+      # Note: For better security, restrict this to specific IPs in production
+      authorized_networks {
+        name  = "github-actions"
+        value = "0.0.0.0/0"
+      }
     }
 
     database_flags {
