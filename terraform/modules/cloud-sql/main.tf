@@ -12,9 +12,9 @@ resource "google_sql_database_instance" "main" {
     deletion_protection_enabled = var.delete_protection_enabled
 
     backup_configuration {
-      enabled                        = var.cloud_sql_backup_enabled
-      start_time                     = "02:00"
-      point_in_time_recovery_enabled = var.environment == "prod"
+      enabled            = var.cloud_sql_backup_enabled
+      start_time         = "02:00"
+      binary_log_enabled = var.environment == "prod"
       backup_retention_settings {
         retained_backups = var.cloud_sql_backup_retention_days
       }
