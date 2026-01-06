@@ -267,6 +267,69 @@ jobs:
           echo "Environment: **${{ needs.validate.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
           echo "Timestamp: $(date)" >> $GITHUB_STEP_SUMMARY
 
+  destroy:
+    name: 🗑️ Terraform Destroy
+    runs-on: ubuntu-latest
+    needs: [validate, plan]
+    environment: ${{ needs.validate.outputs.environment }}
+    if: |
+      needs.plan.result == 'success' &&
+      github.event_name == 'workflow_dispatch' && 
+      github.event.inputs.terraform_action == 'destroy'
+    
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '~1.6.0'
+          terraform_wrapper: false
+
+      - name: 🔐 Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: '${{ secrets.GCP_SA_KEY }}'
+
+      - name: 🛠️ Setup gcloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🚀 Terraform Init
+        run: |
+          cd terraform
+          terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.conf"
+
+      - name: 🗑️ Remove Database Permissions from State
+        run: |
+          cd terraform
+          terraform state rm 'module.database_permissions.mysql_user.fincore_app' || true
+          terraform state rm 'module.database_permissions.mysql_user.fincore_app_proxy' || true
+          terraform state rm 'module.database_permissions.mysql_user.fincore_admin[0]' || true
+          terraform state rm 'module.database_permissions.mysql_user.fincore_admin_proxy[0]' || true
+          terraform state rm 'module.database_permissions.mysql_grant.fincore_app' || true
+          terraform state rm 'module.database_permissions.mysql_grant.fincore_app_proxy' || true
+          terraform state rm 'module.database_permissions.mysql_grant.fincore_admin[0]' || true
+          terraform state rm 'module.database_permissions.mysql_grant.fincore_admin_proxy[0]' || true
+
+      - name: 🗑️ Terraform Destroy
+        run: |
+          cd terraform
+          if [ "${{ github.event.inputs.auto_approve }}" == "true" ]; then
+            terraform destroy \
+              -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars" \
+              -auto-approve
+          else
+            terraform destroy \
+              -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars"
+          fi
+
+      - name: 📊 Destroy Summary
+        run: |
+          echo "## Terraform Destroy Completed" >> $GITHUB_STEP_SUMMARY
+          echo "Environment: **${{ needs.validate.outputs.environment }}**" >> $GITHUB_STEP_SUMMARY
+          echo "Timestamp: $(date)" >> $GITHUB_STEP_SUMMARY
+
   deploy-permissions:
     name: 🔐 Deploy Database Permissions
     runs-on: ubuntu-latest
