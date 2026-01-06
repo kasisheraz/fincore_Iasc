@@ -183,9 +183,11 @@ jobs:
             echo "ℹ️ No changes detected" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ Plan failed" >> $GITHUB_STEP_SUMMARY
+            exit 1
           fi
 
       - name: 💾 Upload Plan Artifact
+        if: success() && (steps.plan.outputs.exitcode == '0' || steps.plan.outputs.exitcode == '2')
         uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ needs.validate.outputs.environment }}
