@@ -21,7 +21,7 @@ output "database_collation" {
   value       = module.cloud_sql.database_collation
 }
 
-# Database Connection Information  
+# Database Connection Information
 output "database_endpoint" {
   description = "Database connection endpoint"
   value       = "${module.cloud_sql.instance_ip_address}:3306"
@@ -40,7 +40,7 @@ output "fincore_app_password_secret" {
 }
 
 output "fincore_admin_password_secret" {
-  description = "Secret Manager secret ID for fincore admin password" 
+  description = "Secret Manager secret ID for fincore admin password"
   value       = google_secret_manager_secret.fincore_admin_password.secret_id
 }
 

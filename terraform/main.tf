@@ -70,7 +70,7 @@ resource "random_password" "fincore_admin_password" {
 # Store passwords in Secret Manager
 resource "google_secret_manager_secret" "root_password" {
   secret_id = "${local.name_prefix}-${local.environment}-root-password"
-  
+
   replication {
     auto {}
   }
@@ -84,7 +84,7 @@ resource "google_secret_manager_secret_version" "root_password" {
 # Store passwords in Secret Manager
 resource "google_secret_manager_secret" "fincore_app_password" {
   secret_id = "${local.name_prefix}-${local.environment}-app-password"
-  
+
   replication {
     auto {}
   }
@@ -97,7 +97,7 @@ resource "google_secret_manager_secret_version" "fincore_app_password" {
 
 resource "google_secret_manager_secret" "fincore_admin_password" {
   secret_id = "${local.name_prefix}-${local.environment}-admin-password"
-  
+
   replication {
     auto {}
   }
