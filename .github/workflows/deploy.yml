@@ -188,7 +188,7 @@ jobs:
 
       - name: 💾 Upload Plan Artifact
         if: success() && (steps.plan.outputs.exitcode == '0' || steps.plan.outputs.exitcode == '2')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: tfplan-${{ needs.validate.outputs.environment }}
           path: terraform/tfplan
@@ -236,7 +236,7 @@ jobs:
           sleep 10
 
       - name: 💾 Download Plan Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
         with:
           name: tfplan-${{ needs.validate.outputs.environment }}
           path: terraform/
