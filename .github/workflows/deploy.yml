@@ -143,7 +143,9 @@ jobs:
           cd terraform
           terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.conf"
 
-      - name: 🧹 Remove orphaned resources from state
+      - name: 🧹 Remove orphaned resources from state (NPE only)
+        if: needs.validate.outputs.environment == 'npe'
+        continue-on-error: true
         run: |
           cd terraform
           # Remove VPC resources that are no longer managed
