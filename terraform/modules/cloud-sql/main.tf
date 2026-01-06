@@ -21,8 +21,7 @@ resource "google_sql_database_instance" "main" {
     }
 
     ip_configuration {
-      ipv4_enabled    = false
-      private_network = var.vpc_network
+      ipv4_enabled    = true
       require_ssl     = var.cloud_sql_require_ssl
     }
 
