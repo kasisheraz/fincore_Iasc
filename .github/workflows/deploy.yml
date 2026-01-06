@@ -300,7 +300,16 @@ jobs:
           cd terraform
           terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.conf"
 
-      - name: 🗑️ Remove Database Permissions from State
+      - name: � Disable Delete Protection First
+        run: |
+          cd terraform
+          # Apply only the Cloud SQL module to disable delete protection
+          terraform apply \
+            -target=module.cloud_sql \
+            -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars" \
+            -auto-approve
+
+      - name: �🗑️ Remove Database Permissions from State
         run: |
           cd terraform
           terraform state rm 'module.database_permissions.mysql_user.fincore_app' || true

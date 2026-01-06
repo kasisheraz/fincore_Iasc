@@ -26,9 +26,5 @@ app_privileges = [
   "CREATE TEMPORARY TABLES", "LOCK TABLES"
 ]
 
-# Security Settings
-require_ssl = true
-
-# User Management (Production specific)
-create_admin_user    = false # No admin user in production
-create_readonly_user = true  # Enable readonly user for monitoring
+# Admin User Configuration
+create_admin_user = false # No admin user in production
