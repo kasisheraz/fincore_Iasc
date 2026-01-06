@@ -44,7 +44,7 @@ resource "google_sql_database" "main" {
   name      = var.database_name
   instance  = google_sql_database_instance.main.name
   charset   = "utf8mb4"
-  collation = "utf8mb4_general_ci"
+  collation = "utf8mb4_0900_ai_ci"  # MySQL 8.0 accent-insensitive, case-insensitive collation
 }
 
 resource "google_sql_user" "root" {

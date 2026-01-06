@@ -28,8 +28,9 @@ This repository manages database infrastructure for the Fincore application usin
 - Instance: `fincore-npe-db` (MySQL 8.0.41)
 - Database: `fincore_db`
 - Character Set: `utf8mb4`
-- Collation: `utf8mb4_general_ci` (case-insensitive)
+- Collation: `utf8mb4_0900_ai_ci` (MySQL 8.0 accent-insensitive, case-insensitive)
 - Lower case table names: Enabled (`lower_case_table_names=1`)
+- **Full case-insensitive support for table names and string comparisons**
 
 **Database Users:**
 - `fincore_app@%`: Application user with full DML/DDL privileges
