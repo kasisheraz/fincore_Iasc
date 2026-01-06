@@ -233,6 +233,14 @@ jobs:
         with:
           name: tfplan-${{ needs.validate.outputs.environment }}
           path: terraform/
+      
+      - name: 🔍 Verify Plan File
+        run: |
+          ls -la terraform/
+          if [ ! -f terraform/tfplan ]; then
+            echo "❌ tfplan file not found after download!"
+            exit 1
+          fi
 
       - name: 🚀 Terraform Apply
         run: |
