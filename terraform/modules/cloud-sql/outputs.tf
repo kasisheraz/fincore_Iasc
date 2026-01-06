@@ -13,7 +13,22 @@ output "instance_id" {
   value       = google_sql_database_instance.main.id
 }
 
+output "instance_ip_address" {
+  description = "Public IP address"
+  value       = google_sql_database_instance.main.public_ip_address
+}
+
 output "private_ip_address" {
   description = "Private IP address"
   value       = google_sql_database_instance.main.private_ip_address
+}
+
+output "database_name" {
+  description = "Database name"
+  value       = google_sql_database.main.name
+}
+
+output "database_collation" {
+  description = "Database collation"
+  value       = google_sql_database.main.collation
 }

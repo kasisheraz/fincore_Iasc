@@ -1,14 +1,23 @@
-# VPC Module - Placeholder
-# This module will be enhanced with full VPC configuration
+# VPC Module - Simplified for existing VPC
+variable "environment" {
+  description = "Environment name"
+  type        = string
+}
 
 output "vpc_network" {
   description = "VPC network name"
-  value       = "fincore-${var.environment}-vpc"
+  value       = "projects/${var.project_id}/global/networks/default"
+}
+
+variable "project_id" {
+  description = "GCP Project ID"
+  type        = string
+  default     = ""
 }
 
 output "private_subnet" {
   description = "Private subnet name"
-  value       = "fincore-${var.environment}-subnet"
+  value       = "default"
 }
 
 output "vpc_connector" {

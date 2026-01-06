@@ -1,6 +1,6 @@
-# Minimal Database Permissions Configuration
-# Only adds database permissions to existing Cloud SQL instance
-# Deployment: 2025-12-30
+# Fincore Infrastructure - Full Cloud SQL Management
+# Manages Cloud SQL instance and database permissions
+# Updated: 2026-01-06 - Added full instance management with case-insensitive collation
 
 # Configure Google Cloud Provider
 provider "google" {
@@ -8,20 +8,55 @@ provider "google" {
   region  = var.region
 }
 
-# Data source for existing Cloud SQL instance
-data "google_sql_database_instance" "existing" {
-  name = "fincore-npe-db"  # Your existing instance
+# Get variables from tfvars
+locals {
+  environment   = var.environment
+  name_prefix   = var.name_prefix
+  database_name = var.database_name
 }
 
-# Configure MySQL provider to connect to existing instance
+# VPC Module (simplified - uses existing VPC)
+module "vpc" {
+  source      = "./modules/vpc"
+  environment = local.environment
+}
+
+# Cloud SQL Module - Now manages the full instance
+module "cloud_sql" {
+  source = "./modules/cloud-sql"
+
+  project_id                      = var.project_id
+  region                          = var.region
+  environment                     = local.environment
+  name_prefix                     = local.name_prefix
+  database_name                   = local.database_name
+  cloud_sql_tier                  = var.cloud_sql_tier
+  cloud_sql_disk_size             = var.cloud_sql_disk_size
+  cloud_sql_backup_enabled        = var.cloud_sql_backup_enabled
+  cloud_sql_backup_retention_days = var.cloud_sql_backup_retention_days
+  cloud_sql_require_ssl           = var.cloud_sql_require_ssl
+  delete_protection_enabled       = var.delete_protection_enabled
+  db_root_password                = random_password.root_password.result
+  db_app_password                 = random_password.fincore_app_password.result
+  app_username                    = var.app_username
+  vpc_network                     = "projects/${var.project_id}/global/networks/default"
+  private_subnet                  = "default"
+}
+
+# Configure MySQL provider to connect to managed instance
 provider "mysql" {
-  endpoint = "${data.google_sql_database_instance.existing.public_ip_address}:3306"
+  endpoint = "${module.cloud_sql.instance_ip_address}:3306"
   username = "root"
-  password = "TempRoot2024!"  # Your current password
+  password = random_password.root_password.result
   tls      = false
 }
 
-# Generate new passwords
+# Generate passwords
+resource "random_password" "root_password" {
+  length  = 16
+  special = true
+}
+
 resource "random_password" "fincore_app_password" {
   length  = 16
   special = true
@@ -32,9 +67,23 @@ resource "random_password" "fincore_admin_password" {
   special = true
 }
 
-# Store new passwords in Secret Manager
+# Store passwords in Secret Manager
+resource "google_secret_manager_secret" "root_password" {
+  secret_id = "${local.name_prefix}-${local.environment}-root-password"
+  
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "root_password" {
+  secret      = google_secret_manager_secret.root_password.id
+  secret_data = random_password.root_password.result
+}
+
+# Store passwords in Secret Manager
 resource "google_secret_manager_secret" "fincore_app_password" {
-  secret_id = "fincore-npe-app-password"
+  secret_id = "${local.name_prefix}-${local.environment}-app-password"
   
   replication {
     auto {}
@@ -47,7 +96,7 @@ resource "google_secret_manager_secret_version" "fincore_app_password" {
 }
 
 resource "google_secret_manager_secret" "fincore_admin_password" {
-  secret_id = "fincore-npe-admin-password"
+  secret_id = "${local.name_prefix}-${local.environment}-admin-password"
   
   replication {
     auto {}
@@ -59,39 +108,31 @@ resource "google_secret_manager_secret_version" "fincore_admin_password" {
   secret_data = random_password.fincore_admin_password.result
 }
 
-# Database Permissions Module - simplified call
+# Database Permissions Module
 module "database_permissions" {
   source = "./modules/database-permissions"
 
-  # Connection to existing database
-  database_endpoint = "${data.google_sql_database_instance.existing.public_ip_address}:3306"
+  # Connection to managed database
+  database_endpoint = "${module.cloud_sql.instance_ip_address}:3306"
   admin_username    = "root"
-  admin_password    = "TempRoot2024!"
+  admin_password    = random_password.root_password.result
   
   # Database configuration
-  database_name = "fincore_db"
-  app_username  = "fincore_app"
+  database_name = local.database_name
+  app_username  = var.app_username
   app_password  = random_password.fincore_app_password.result
   
   # Relaxed permissions for schema evolution
-  app_privileges = [
-    "SELECT", "INSERT", "UPDATE", "DELETE",
-    "CREATE", "DROP", "INDEX", "ALTER",
-    "CREATE TEMPORARY TABLES", "LOCK TABLES"
-  ]
+  app_privileges = var.app_privileges
   
-  # Security settings (relaxed for NPE)
-  require_ssl = false
+  # Security settings
+  require_ssl = var.cloud_sql_require_ssl
   
-  # NPE admin user for schema management
-  create_admin_user  = true
+  # Admin user for schema management
+  create_admin_user  = var.create_admin_user
   app_admin_username = "fincore_admin"
   app_admin_password = random_password.fincore_admin_password.result
-  admin_privileges   = [
-    "SELECT", "INSERT", "UPDATE", "DELETE",
-    "CREATE", "DROP", "INDEX", "ALTER",
-    "CREATE TEMPORARY TABLES", "LOCK TABLES"
-  ]
+  admin_privileges   = var.app_privileges
   
   # No readonly user in NPE
   create_readonly_user = false
@@ -99,6 +140,8 @@ module "database_permissions" {
   readonly_password    = ""
   
   # Environment context
-  environment = "npe"
+  environment = local.environment
   project_id  = var.project_id
+  
+  depends_on = [module.cloud_sql]
 }
