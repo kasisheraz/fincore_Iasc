@@ -160,11 +160,14 @@ jobs:
         id: plan
         run: |
           cd terraform
+          set +e
           terraform plan \
             -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars" \
             -out=tfplan \
             -detailed-exitcode
-        continue-on-error: true
+          EXITCODE=$?
+          echo "exitcode=$EXITCODE" >> $GITHUB_OUTPUT
+          exit 0
 
       - name: 📊 Plan Summary
         run: |
