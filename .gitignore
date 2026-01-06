@@ -1,5 +1,9 @@
 ﻿# GCP Service Account Key
 gcp-sa-key.json
+*.json
+
+# Setup Scripts
+setup-github-secret.ps1
 
 # Terraform
 .terraform/
@@ -8,3 +12,4 @@ gcp-sa-key.json
 *.tfstate.backup
 *.tfvars.backup
 .terraform.tfstate.lock.info
+terraform/tools/
