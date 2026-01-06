@@ -230,6 +230,11 @@ jobs:
           cd terraform
           terraform init -backend-config="environments/${{ needs.validate.outputs.environment }}/backend.conf"
 
+      - name: ⏳ Wait for artifact availability
+        run: |
+          echo "Waiting for artifact to be indexed by GitHub..."
+          sleep 10
+
       - name: 💾 Download Plan Artifact
         uses: actions/download-artifact@v4
         with:
