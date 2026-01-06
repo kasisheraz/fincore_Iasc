@@ -3,7 +3,7 @@
 
 # Basic Infrastructure
 project_id  = "project-07a61357-b791-4255-a9e"
-region      = "us-central1"
+region      = "europe-west2"
 environment = "npe"
 name_prefix = "fincore"
 
@@ -14,8 +14,8 @@ app_username  = "fincore_app"
 # Cloud SQL Configuration (Development settings)
 cloud_sql_tier                  = "db-f1-micro"
 cloud_sql_disk_size             = 10
-cloud_sql_backup_enabled        = true
-cloud_sql_backup_retention_days = 7
+cloud_sql_backup_enabled        = false
+cloud_sql_backup_retention_days = 1
 cloud_sql_require_ssl           = false # Relaxed for NPE
 delete_protection_enabled       = false # Disabled for NPE
 
