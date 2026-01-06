@@ -186,9 +186,22 @@ jobs:
             exit 1
           fi
 
+      - name: � Verify tfplan file exists
+        if: success()
+        run: |
+          cd terraform
+          if [ -f tfplan ]; then
+            echo "✅ tfplan file found"
+            ls -lh tfplan
+          else
+            echo "❌ tfplan file not found!"
+            ls -la
+            exit 1
+          fi
+
       - name: 💾 Upload Plan Artifact
         if: success() && (steps.plan.outputs.exitcode == '0' || steps.plan.outputs.exitcode == '2')
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: tfplan-${{ needs.validate.outputs.environment }}
           path: terraform/tfplan
@@ -236,7 +249,7 @@ jobs:
           sleep 10
 
       - name: 💾 Download Plan Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: tfplan-${{ needs.validate.outputs.environment }}
           path: terraform/
