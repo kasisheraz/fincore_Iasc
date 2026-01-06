@@ -17,7 +17,7 @@ cloud_sql_disk_size             = 100
 cloud_sql_backup_enabled        = true
 cloud_sql_backup_retention_days = 30
 cloud_sql_require_ssl           = true # Required for production
-delete_protection_enabled       = true # Enabled for production
+delete_protection_enabled       = false # Disabled to allow destruction
 
 # Database Permissions (Same as NPE for flexibility during schema changes)
 app_privileges = [
