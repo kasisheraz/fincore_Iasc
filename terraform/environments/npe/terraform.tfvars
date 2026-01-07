@@ -26,9 +26,5 @@ app_privileges = [
   "CREATE TEMPORARY TABLES", "LOCK TABLES"
 ]
 
-# Security Settings (Relaxed)
-require_ssl = false
-
-# User Management (NPE specific)
-create_admin_user    = true  # Enable admin user for schema management
-create_readonly_user = false # Not needed in NPE
+# Admin User Configuration
+create_admin_user = true # Enable admin user for schema management
