@@ -261,13 +261,36 @@ jobs:
             -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars" \
             -out=tfplan
 
-      - name: 🚀 Terraform Apply
+      - name: 🚀 Terraform Apply (excluding database permissions)
         run: |
           cd terraform
+          # Apply everything except database_permissions module to avoid MySQL connection issues
           if [[ "${{ github.event.inputs.auto_approve }}" == "true" ]]; then
-            terraform apply -auto-approve tfplan
+            terraform apply -auto-approve \
+              -target=random_password.root_password \
+              -target=random_password.fincore_app_password \
+              -target=random_password.fincore_admin_password \
+              -target=google_secret_manager_secret.root_password \
+              -target=google_secret_manager_secret.fincore_app_password \
+              -target=google_secret_manager_secret.fincore_admin_password \
+              -target=google_secret_manager_secret_version.root_password \
+              -target=google_secret_manager_secret_version.fincore_app_password \
+              -target=google_secret_manager_secret_version.fincore_admin_password \
+              -target=module.cloud_sql \
+              -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars"
           else
-            terraform apply tfplan
+            terraform apply \
+              -target=random_password.root_password \
+              -target=random_password.fincore_app_password \
+              -target=random_password.fincore_admin_password \
+              -target=google_secret_manager_secret.root_password \
+              -target=google_secret_manager_secret.fincore_app_password \
+              -target=google_secret_manager_secret.fincore_admin_password \
+              -target=google_secret_manager_secret_version.root_password \
+              -target=google_secret_manager_secret_version.fincore_app_password \
+              -target=google_secret_manager_secret_version.fincore_admin_password \
+              -target=module.cloud_sql \
+              -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars"
           fi
 
       - name: 📊 Apply Summary
