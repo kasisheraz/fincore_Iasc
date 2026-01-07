@@ -265,34 +265,18 @@ jobs:
         run: |
           cd terraform
           # Apply everything except database_permissions module to avoid MySQL connection issues
-          # Auto-approve for develop branch pushes or when explicitly set
-          if [[ "${{ github.event.inputs.auto_approve }}" == "true" || "${{ github.ref }}" == "refs/heads/develop" ]]; then
-            terraform apply -auto-approve \
-              -target=random_password.root_password \
-              -target=random_password.fincore_app_password \
-              -target=random_password.fincore_admin_password \
-              -target=google_secret_manager_secret.root_password \
-              -target=google_secret_manager_secret.fincore_app_password \
-              -target=google_secret_manager_secret.fincore_admin_password \
-              -target=google_secret_manager_secret_version.root_password \
-              -target=google_secret_manager_secret_version.fincore_app_password \
-              -target=google_secret_manager_secret_version.fincore_admin_password \
-              -target=module.cloud_sql \
-              -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars"
-          else
-            terraform apply \
-              -target=random_password.root_password \
-              -target=random_password.fincore_app_password \
-              -target=random_password.fincore_admin_password \
-              -target=google_secret_manager_secret.root_password \
-              -target=google_secret_manager_secret.fincore_app_password \
-              -target=google_secret_manager_secret.fincore_admin_password \
-              -target=google_secret_manager_secret_version.root_password \
-              -target=google_secret_manager_secret_version.fincore_app_password \
-              -target=google_secret_manager_secret_version.fincore_admin_password \
-              -target=module.cloud_sql \
-              -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars"
-          fi
+          terraform apply -auto-approve \
+            -target=random_password.root_password \
+            -target=random_password.fincore_app_password \
+            -target=random_password.fincore_admin_password \
+            -target=google_secret_manager_secret.root_password \
+            -target=google_secret_manager_secret.fincore_app_password \
+            -target=google_secret_manager_secret.fincore_admin_password \
+            -target=google_secret_manager_secret_version.root_password \
+            -target=google_secret_manager_secret_version.fincore_app_password \
+            -target=google_secret_manager_secret_version.fincore_admin_password \
+            -target=module.cloud_sql \
+            -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars"
 
               -target=google_secret_manager_secret.root_password \
               -target=google_secret_manager_secret.fincore_app_password \
