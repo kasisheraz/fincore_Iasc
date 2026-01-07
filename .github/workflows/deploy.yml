@@ -277,6 +277,7 @@ jobs:
             -target=google_secret_manager_secret_version.fincore_admin_password \
             -target=module.cloud_sql \
             -var-file="environments/${{ needs.validate.outputs.environment }}/terraform.tfvars"
+          exit 0
 
               -target=google_secret_manager_secret.root_password \
               -target=google_secret_manager_secret.fincore_app_password \
